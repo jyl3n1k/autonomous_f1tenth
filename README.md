@@ -87,3 +87,33 @@ colcon build
 ros2 launch reinforcement_learning train.launch.py # or test.launch.py if you were testing your agents
 ```
 Refer to this [link](https://docs.ros.org/en/foxy/Tutorials/Beginner-Client-Libraries/Colcon-Tutorial.html) for more information on `colcon build` in `ros2`
+
+## TurtleBot3 Burger camera model
+
+The `CarTrack` environment can launch either the F1TENTH vehicle or a TurtleBot3
+Burger camera model. To train with the TurtleBot, set these parameters in
+`src/reinforcement_learning/config/train.yaml`:
+
+```yaml
+environment: 'CarTrack'
+robot_model: 'turtlebot3_burger_cam'
+car_name: 'turtlebot3'
+```
+
+Use the same values in `test.yaml` when evaluating a TurtleBot policy. The
+existing lidar and odometry observations, track-progress reward, reset service,
+and stepping service are reused. TurtleBot actions are interpreted as linear
+velocity and angular velocity and use the limits in
+`src/environments/config/config.yaml`.
+
+The camera is published on `/turtlebot3/camera/image_raw`, with camera metadata
+on `/turtlebot3/camera/camera_info`. Camera pixels are not currently part of the
+RL observation; the policy continues to use lidar and odometry, so TurtleBot
+policies should be trained separately from F1TENTH policies. The upstream
+fisheye sensor is represented as an 80-degree perspective RGB camera because
+Gazebo Garden's wide-angle camera requires Ogre 1.x while these worlds use
+Ogre2.
+
+The vendored TurtleBot model and meshes originate from ROBOTIS-GIT's
+`turtlebot3_simulations` project and retain its Apache-2.0 license under
+`src/environments/models/LICENSE.turtlebot3_simulations`.

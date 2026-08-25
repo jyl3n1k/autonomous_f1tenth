@@ -19,6 +19,7 @@ class TrainingConfig(SubscriptableClass):
 class EnvironmentConfig(SubscriptableClass):
     environment: str
     car_name: str
+    robot_model: str
     reward_range: float
     max_steps: int
     step_length: float

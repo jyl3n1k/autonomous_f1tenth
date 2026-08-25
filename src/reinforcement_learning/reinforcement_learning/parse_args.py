@@ -24,6 +24,7 @@ def __declare_params():
             # Environment Parameters ---------------------------
             ('environment', 'CarGoal'),
             ('car_name', 'f1tenth'),
+            ('robot_model', 'f1tenth'),
             ('ftg_car_name', 'ftg_car'),
             ('track', 'multi_track'),
             ('max_steps', 3000),
@@ -68,6 +69,7 @@ def __get_env_params(param_node: Node):
     params: list(Parameter) = param_node.get_parameters([
         'environment',
         'car_name',
+        'robot_model',
         'track',
         'max_steps',
         'step_length',
@@ -178,4 +180,3 @@ def __get_network_params(param_node: Node):
     rest = {key: params_dict[key] for key in rest}
 
     return config, rest
-

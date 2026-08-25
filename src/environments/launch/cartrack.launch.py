@@ -3,16 +3,21 @@ from ament_index_python import get_package_share_directory
 from launch_ros.actions import Node 
 from launch import LaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, OpaqueFunction
+from launch.actions import (
+    AppendEnvironmentVariable,
+    IncludeLaunchDescription,
+    DeclareLaunchArgument,
+    OpaqueFunction,
+)
 from launch.substitutions import LaunchConfiguration
 
 def launch(context, *args, **kwargs):
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     pkg_environments = get_package_share_directory('environments')
-    pkg_f1tenth_bringup = get_package_share_directory('f1tenth_bringup')
 
     track = LaunchConfiguration('track').perform(context)
     car_name = LaunchConfiguration('car_name').perform(context)
+    robot_model = LaunchConfiguration('robot_model').perform(context)
     
     gz_sim = IncludeLaunchDescription(
         launch_description_source=PythonLaunchDescriptionSource(
@@ -22,17 +27,92 @@ def launch(context, *args, **kwargs):
         }.items()
     )
 
-    f1tenth = IncludeLaunchDescription(
-        launch_description_source=PythonLaunchDescriptionSource(
-            os.path.join(pkg_f1tenth_bringup, 'simulation_bringup.launch.py')),
-        launch_arguments={
-            'name': car_name,
-            'world': 'empty'
-        }.items()
+    reset = Node(
+        package='environments',
+        executable='F1TenthReset',
+        parameters=[{
+            'env_name': 'car_track',
+            'robot_z': 0.01 if robot_model == 'turtlebot3_burger_cam' else 0.0,
+        }],
+        output='screen',
+        emulate_tty=True,
+    )
+    goal = Node(
+        package='ros_gz_sim',
+        executable='create',
+        arguments=[
+            '-name', 'goal',
+            '-file', os.path.join(pkg_environments, 'sdf', 'goal.sdf'),
+            '-x', '1.0',
+            '-y', '1.0',
+            '-z', '1.0',
+        ],
+        output='screen',
     )
 
+    if robot_model == 'f1tenth':
+        pkg_f1tenth_bringup = get_package_share_directory('f1tenth_bringup')
+        robot = IncludeLaunchDescription(
+            launch_description_source=PythonLaunchDescriptionSource(
+                os.path.join(pkg_f1tenth_bringup, 'simulation_bringup.launch.py')),
+            launch_arguments={
+                'name': car_name,
+                'world': 'empty'
+            }.items()
+        )
+        return [gz_sim, robot, goal, reset]
 
-    return[gz_sim, f1tenth]
+    if robot_model == 'turtlebot3_burger_cam':
+        if car_name != 'turtlebot3':
+            raise RuntimeError(
+                "The TurtleBot model currently requires car_name='turtlebot3' "
+                "because its Gazebo topics are namespaced in the SDF."
+            )
+
+        model_path = os.path.join(
+            pkg_environments,
+            'models',
+            'turtlebot3_burger_cam',
+            'model.sdf',
+        )
+        bridge_path = os.path.join(
+            pkg_environments,
+            'config',
+            'turtlebot3_burger_cam_bridge.yaml',
+        )
+
+        robot = Node(
+            package='ros_gz_sim',
+            executable='create',
+            arguments=[
+                '-name', car_name,
+                '-file', model_path,
+                '-z', '0.01',
+            ],
+            output='screen',
+        )
+        robot_bridge = Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            arguments=[
+                '--ros-args',
+                '-p',
+                f'config_file:={bridge_path}',
+            ],
+            output='screen',
+        )
+        image_bridge = Node(
+            package='ros_gz_image',
+            executable='image_bridge',
+            arguments=['/turtlebot3/camera/image_raw'],
+            output='screen',
+        )
+        return [gz_sim, robot, robot_bridge, image_bridge, goal, reset]
+
+    raise RuntimeError(
+        f"Unsupported robot_model '{robot_model}'. "
+        "Expected 'f1tenth' or 'turtlebot3_burger_cam'."
+    )
 
 def generate_launch_description():
 
@@ -44,6 +124,17 @@ def generate_launch_description():
     car_name = DeclareLaunchArgument(
         'car_name',
         default_value='f1tenth'
+    )
+
+    robot_model = DeclareLaunchArgument(
+        'robot_model',
+        default_value='f1tenth'
+    )
+
+    pkg_environments = get_package_share_directory('environments')
+    model_resource_path = AppendEnvironmentVariable(
+        'GZ_SIM_RESOURCE_PATH',
+        os.path.join(pkg_environments, 'models'),
     )
 
     service_bridge = Node(
@@ -69,21 +160,12 @@ def generate_launch_description():
             emulate_tty=True,
     )
 
-    reset = Node(
-            package='environments',
-            executable='F1TenthReset',
-            parameters=[
-                {'env_name': 'car_track'}
-            ],
-            output='screen',
-            emulate_tty=True,
-    )
-
     return LaunchDescription([
+        model_resource_path,
         track_arg,
+        car_name,
+        robot_model,
         OpaqueFunction(function=launch),
         service_bridge,
-        reset,
         stepping_service,
-        car_name,
 ])

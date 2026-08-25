@@ -3,3 +3,11 @@ actions:
   max_turn: 0.434
   min_speed: 0.5
   min_turn: -0.434
+
+# TurtleBot3 Burger limits. The second action is angular velocity (rad/s),
+# rather than the Ackermann steering angle used by the F1TENTH model.
+turtlebot3_actions:
+  max_speed: 0.22
+  max_turn: 2.84
+  min_speed: 0.0
+  min_turn: -2.84

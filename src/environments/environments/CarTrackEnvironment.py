@@ -56,9 +56,22 @@ class CarTrackEnvironment(F1tenthEnvironment):
                  track='track_1',
                  observation_mode='lidar_only',
                  is_staged_training=False,
-                 config_path='/home/anyone/autonomous_f1tenth/src/environments/config/config.yaml',
+                 robot_model='f1tenth',
+                 config_path=None,
                  ):
-        super().__init__('car_track', car_name, reward_range, max_steps, collision_range, step_length, 10, track, observation_mode)
+        super().__init__(
+            'car_track',
+            car_name,
+            reward_range,
+            max_steps,
+            collision_range,
+            step_length,
+            10,
+            track,
+            observation_mode,
+            robot_model,
+            config_path,
+        )
 
         #####################################################################################################################
         # Reward configuration -----------------------------------------

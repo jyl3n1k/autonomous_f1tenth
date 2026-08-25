@@ -12,6 +12,14 @@ for folder in folders:
     except:
         print("Not working")
 
+model_files = []
+for root, _, files in os.walk('models'):
+    if files:
+        model_files.append((
+            os.path.join('share', package_name, root),
+            [os.path.join(root, filename) for filename in files]
+        ))
+
 setup(
     name=package_name,
     version='0.0.0',
@@ -27,6 +35,7 @@ setup(
         (os.path.join('share', package_name, 'worlds'), glob('worlds/*')),
         (os.path.join('share', package_name, 'meshes'), glob('meshes/*')),
         (os.path.join('share', 'f1tenth', 'f1tenth_description', 'meshes'), glob('meshes/*')),
+        *model_files,
         *map_infos,
     ],
     install_requires=['setuptools'],

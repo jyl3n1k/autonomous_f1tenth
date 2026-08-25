@@ -1,24 +1,44 @@
+import math
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from environment_interfaces.srv import Reset
-from f1tenth_control.SimulationServices import SimulationServices
 from ros_gz_interfaces.srv import SetEntityPose
 from ros_gz_interfaces.msg import Entity
 from geometry_msgs.msg import Pose, Point
-from ament_index_python import get_package_share_directory
 
-from .util import get_quaternion_from_euler
+
+
+def get_quaternion_from_euler(roll, pitch, yaw):
+    """Return an x-y-z-w quaternion without importing ML dependencies."""
+    qx = (
+        math.sin(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2)
+        - math.cos(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
+    )
+    qy = (
+        math.cos(roll / 2) * math.sin(pitch / 2) * math.cos(yaw / 2)
+        + math.sin(roll / 2) * math.cos(pitch / 2) * math.sin(yaw / 2)
+    )
+    qz = (
+        math.cos(roll / 2) * math.cos(pitch / 2) * math.sin(yaw / 2)
+        - math.sin(roll / 2) * math.sin(pitch / 2) * math.cos(yaw / 2)
+    )
+    qw = (
+        math.cos(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2)
+        + math.sin(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
+    )
+    return [qx, qy, qz, qw]
 
 class F1TenthReset(Node):
 
-    def __init__(self, env_name):
+    def __init__(self, env_name, robot_z=0.0):
         
         name = env_name + '_reset'
         
         super().__init__(name)
         self.get_logger().info("Environment: " + name)
+        self.robot_z = robot_z
 
         srv_cb_group = MutuallyExclusiveCallbackGroup()
         self.srv = self.create_service(Reset, name, callback=self.service_callback, callback_group=srv_cb_group)
@@ -36,7 +56,13 @@ class F1TenthReset(Node):
     def service_callback(self, request, response):
 
         goal_req = self.create_request('goal', x=request.gx, y=request.gy, z=1)
-        car_req = self.create_request(request.car_name, x=request.cx, y=request.cy, z=0, yaw=request.cyaw)
+        car_req = self.create_request(
+            request.car_name,
+            x=request.cx,
+            y=request.cy,
+            z=self.robot_z,
+            yaw=request.cyaw,
+        )
 
         while not self.set_pose_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('set_pose service not available, waiting again...')
@@ -79,15 +105,11 @@ def main():
     param_node = rclpy.create_node('params')
     
     param_node.declare_parameter('env_name', 'beep')
+    param_node.declare_parameter('robot_z', 0.0)
     env_name = param_node.get_parameter('env_name').get_parameter_value().string_value
+    robot_z = param_node.get_parameter('robot_z').get_parameter_value().double_value
     
-    pkg_environments = get_package_share_directory('environments')
-
-    reset_service = F1TenthReset(env_name)
-
-    services = SimulationServices('empty')
-
-    services.spawn(sdf_filename=f"{pkg_environments}/sdf/goal.sdf", pose=[1, 1, 1], name='goal')
+    reset_service = F1TenthReset(env_name, robot_z)
 
     reset_service.get_logger().info('Environment Spawning Complete')
 
@@ -103,4 +125,3 @@ def main():
 if __name__ == '__main__':
     main()
     
-

@@ -20,7 +20,8 @@ class EnvironmentFactory:
                 config['step_length'], 
                 config['track'], 
                 config['observation_mode'], 
-                config['is_staged_training']
+                config['is_staged_training'],
+                config['robot_model'],
                 )
         elif name == 'CarRace':
             return CarRaceEnvironment(

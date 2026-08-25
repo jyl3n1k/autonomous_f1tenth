@@ -1,5 +1,7 @@
+import os
 import numpy as np
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Twist
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from rclpy import Future
@@ -13,6 +15,7 @@ from .util_track_progress import TrackMathDef
 from .waypoints import waypoints
 import yaml
 import torch
+from typing import Literal
 
 class F1tenthEnvironment(Node):
 
@@ -26,7 +29,8 @@ class F1tenthEnvironment(Node):
                  lidar_points = 10,
                  track='track_1',
                  observation_mode='lidar_only',
-                 config_path='/home/anyone/autonomous_f1tenth/src/environments/config/config.yaml',
+                 robot_model='f1tenth',
+                 config_path=None,
                  ):
         super().__init__(env_name + '_environment')
 
@@ -43,6 +47,7 @@ class F1tenthEnvironment(Node):
         self.LIDAR_POINTS = lidar_points
         self.TRACK = track
         self.ODOM_OBSERVATION_MODE = observation_mode
+        self.ROBOT_MODEL = robot_model
 
         # configure odom observation size:
         match observation_mode:
@@ -91,11 +96,22 @@ class F1tenthEnvironment(Node):
                 self.AE_LOSS_FUNCTION = torch.nn.MSELoss()
                 self.AE_OPTIMIZER = torch.optim.Adam(self.AE_LIDAR_MODEL.parameters(), lr=1e-3)
 
+        if config_path is None:
+            config_path = os.path.join(
+                get_package_share_directory('environments'),
+                'config',
+                'config.yaml',
+            )
+
         with open(config_path, 'r') as file:
             config = yaml.safe_load(file)
 
-        self.MAX_ACTIONS = np.asarray([config['actions']['max_speed'], config['actions']['max_turn']])
-        self.MIN_ACTIONS = np.asarray([config['actions']['min_speed'], config['actions']['min_turn']])
+        action_config = config['actions']
+        if robot_model == 'turtlebot3_burger_cam':
+            action_config = config['turtlebot3_actions']
+
+        self.MAX_ACTIONS = np.asarray([action_config['max_speed'], action_config['max_turn']])
+        self.MIN_ACTIONS = np.asarray([action_config['min_speed'], action_config['min_turn']])
  
         #####################################################################################################################
         # Pub/Sub ----------------------------------------------------
@@ -223,7 +239,10 @@ class F1tenthEnvironment(Node):
         return data['odom'], data['lidar']
 
     def set_velocity(self, lin_vel, steering_angle, L=0.325):
-        angular = ackermann_to_twist(steering_angle, lin_vel, L)
+        if self.ROBOT_MODEL == 'turtlebot3_burger_cam':
+            angular = steering_angle
+        else:
+            angular = ackermann_to_twist(steering_angle, lin_vel, L)
         velocity_msg = Twist()
         velocity_msg.angular.z = float(angular)
         velocity_msg.linear.x = float(lin_vel)

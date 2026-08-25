@@ -16,7 +16,6 @@ env_launch = {
 }
 
 def generate_launch_description():
-    pkg_f1tenth_description = get_package_share_directory('f1tenth_description')
     pkg_environments = get_package_share_directory('environments')
 
     config_path = os.path.join(
@@ -26,16 +25,33 @@ def generate_launch_description():
 
     config = yaml.load(open(config_path), Loader=yaml.Loader)
     env = config['test']['ros__parameters']['environment']
+    robot_model = config['test']['ros__parameters'].get('robot_model', 'f1tenth')
+
+    resource_path_actions = []
+    if robot_model == 'f1tenth':
+        pkg_f1tenth_description = get_package_share_directory('f1tenth_description')
+        resource_path_actions.append(
+            SetEnvironmentVariable(
+                name='GZ_SIM_RESOURCE_PATH',
+                value=pkg_f1tenth_description[:-19],
+            )
+        )
+
+    environment_arguments = {
+        'track': TextSubstitution(text=str(config['test']['ros__parameters']['track'])),
+        'car_name': TextSubstitution(text=str(config['test']['ros__parameters']['car_name']) if 'car_name' in config['test']['ros__parameters'] else 'f1tenth'),
+        'car_one': TextSubstitution(text=str(config['test']['ros__parameters']['car_name']) if 'car_name' in config['test']['ros__parameters'] else 'f1tenth'),
+        'car_two': TextSubstitution(text=str(config['test']['ros__parameters']['ftg_car_name']) if 'ftg_car_name' in config['test']['ros__parameters'] else 'ftg_car'),
+    }
+    if env == 'CarTrack':
+        environment_arguments['robot_model'] = TextSubstitution(
+            text=str(config['test']['ros__parameters'].get('robot_model', 'f1tenth'))
+        )
 
     environment =  IncludeLaunchDescription(
         launch_description_source=PythonLaunchDescriptionSource(
             os.path.join(pkg_environments, f'{env_launch[env]}.launch.py')),
-        launch_arguments={
-            'track': TextSubstitution(text=str(config['test']['ros__parameters']['track'])),
-            'car_name': TextSubstitution(text=str(config['test']['ros__parameters']['car_name']) if 'car_name' in config['test']['ros__parameters'] else 'f1tenth'),
-            'car_one': TextSubstitution(text=str(config['test']['ros__parameters']['car_name']) if 'car_name' in config['test']['ros__parameters'] else 'f1tenth'),
-            'car_two': TextSubstitution(text=str(config['test']['ros__parameters']['ftg_car_name']) if 'ftg_car_name' in config['test']['ros__parameters'] else 'ftg_car'),
-        }.items() #TODO: this doesn't do anything
+        launch_arguments=environment_arguments.items() #TODO: this doesn't do anything
     )
 
     # Launch the Environment
@@ -80,8 +96,7 @@ def generate_launch_description():
                 emulate_tty=True, # Allows python print to show
             )
         return LaunchDescription([
-        #TODO: Find a way to remove this
-        SetEnvironmentVariable(name='GZ_SIM_RESOURCE_PATH', value=pkg_f1tenth_description[:-19]),
+        *resource_path_actions,
         SetParameter(name='use_sim_time', value=True),
         environment,
         main,
@@ -89,8 +104,7 @@ def generate_launch_description():
         ])
 
     return LaunchDescription([
-        #TODO: Find a way to remove this
-        SetEnvironmentVariable(name='GZ_SIM_RESOURCE_PATH', value=pkg_f1tenth_description[:-19]),
+        *resource_path_actions,
         SetParameter(name='use_sim_time', value=True),
         environment,
         main,

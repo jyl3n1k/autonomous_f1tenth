@@ -3,6 +3,8 @@ install
 log
 data
 models
+!src/environments/models/
+!src/environments/models/**
 notes
 training_logs
 checkpoint
