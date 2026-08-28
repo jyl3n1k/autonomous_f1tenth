@@ -18,6 +18,9 @@ def launch(context, *args, **kwargs):
     track = LaunchConfiguration('track').perform(context)
     car_name = LaunchConfiguration('car_name').perform(context)
     robot_model = LaunchConfiguration('robot_model').perform(context)
+    spawn_x = LaunchConfiguration('spawn_x').perform(context)
+    spawn_y = LaunchConfiguration('spawn_y').perform(context)
+    spawn_yaw = LaunchConfiguration('spawn_yaw').perform(context)
     
     gz_sim = IncludeLaunchDescription(
         launch_description_source=PythonLaunchDescriptionSource(
@@ -87,7 +90,10 @@ def launch(context, *args, **kwargs):
             arguments=[
                 '-name', car_name,
                 '-file', model_path,
+                '-x', spawn_x,
+                '-y', spawn_y,
                 '-z', '0.01',
+                '-Y', spawn_yaw,
             ],
             output='screen',
         )
@@ -131,6 +137,21 @@ def generate_launch_description():
         default_value='f1tenth'
     )
 
+    spawn_x = DeclareLaunchArgument(
+        'spawn_x',
+        default_value='0.0'
+    )
+
+    spawn_y = DeclareLaunchArgument(
+        'spawn_y',
+        default_value='0.0'
+    )
+
+    spawn_yaw = DeclareLaunchArgument(
+        'spawn_yaw',
+        default_value='0.0'
+    )
+
     pkg_environments = get_package_share_directory('environments')
     model_resource_path = AppendEnvironmentVariable(
         'GZ_SIM_RESOURCE_PATH',
@@ -165,6 +186,9 @@ def generate_launch_description():
         track_arg,
         car_name,
         robot_model,
+        spawn_x,
+        spawn_y,
+        spawn_yaw,
         OpaqueFunction(function=launch),
         service_bridge,
         stepping_service,

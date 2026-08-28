@@ -1,0 +1,36 @@
+turtlebot3_vision_controller:
+  ros__parameters:
+    use_sim_time: true
+
+    camera_topic: /turtlebot3/camera/image_raw
+    command_topic: /turtlebot3/cmd_vel
+    debug_image_topic: /turtlebot3/vision/debug_image
+    debug_mask_topic: /turtlebot3/vision/corridor_mask
+    publish_debug: true
+
+    # The narrow-track floor is bright and low-saturation; the exterior is
+    # yellow. Adjust these first if the green debug overlay misses the floor.
+    roi_top_fraction: 0.35
+    max_saturation: 85
+    min_value: 105
+    morphology_kernel: 5
+    min_component_area: 350
+
+    near_row_fraction: 0.86
+    far_row_fraction: 0.38
+    sample_row_count: 8
+    row_band_height: 5
+    min_corridor_width: 8
+    minimum_confidence: 0.50
+
+    kp_lateral: 1.15
+    kd_lateral: 0.08
+    kp_heading: 1.35
+    steering_smoothing: 0.35
+
+    # Conservative limits for a TurtleBot3 Burger.
+    max_linear_speed: 0.16
+    min_linear_speed: 0.05
+    max_angular_speed: 1.50
+    turn_slowdown: 0.72
+    image_timeout: 0.50
