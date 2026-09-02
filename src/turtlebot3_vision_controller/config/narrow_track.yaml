@@ -29,8 +29,8 @@ turtlebot3_vision_controller:
     steering_smoothing: 0.35
 
     # Conservative limits for a TurtleBot3 Burger.
-    max_linear_speed: 0.16
-    min_linear_speed: 0.05
-    max_angular_speed: 1.50
-    turn_slowdown: 0.72
+    max_linear_speed: 0.22
+    min_linear_speed: 0.08
+    max_angular_speed: 1.75
+    turn_slowdown: 0.60
     image_timeout: 0.50

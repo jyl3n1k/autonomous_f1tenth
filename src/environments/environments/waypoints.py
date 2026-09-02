@@ -7478,6 +7478,32 @@ Waypoint(1.814059547948363, 0.9590498883216871, 2.511194752729538, 198),
 Waypoint(0.9126419540241857, 2.2183887715438, 2.0200035634452904, 199),   
 ]
 
+
+def scaled_turtlebot_waypoints(source, scale, corridor_width=0.50, margin=0.70):
+    """Scale a centerline and translate it into a positive-coordinate world."""
+    minimum_x = min(point.x for point in source)
+    minimum_y = min(point.y for point in source)
+    offset = margin + corridor_width / 2
+    return [
+        Waypoint(
+            (point.x - minimum_x) * scale + offset,
+            (point.y - minimum_y) * scale + offset,
+            point.Y,
+            point.index,
+        )
+        for point in source
+    ]
+
+
+TURTLEBOT_TRACK_01_WAYPOINTS = scaled_turtlebot_waypoints(
+    TRACK_01_1M_WAYPOINTS,
+    0.60,
+)
+TURTLEBOT_TRACK_05_WAYPOINTS = scaled_turtlebot_waypoints(
+    TRACK_05_1M_WAYPOINTS,
+    0.50,
+)
+
 waypoints = {
     'austin_track': [
         Waypoint(0.00, 0.00, -0.65, 0),
@@ -9524,5 +9550,7 @@ waypoints = {
     'track_04_2m_reverse': TRACK_04_2M_REVERSE_WAYPOINTS,
     'track_05_1m': TRACK_05_1M_WAYPOINTS,
     'track_06_1m': TRACK_06_1M_WAYPOINTS,
+    'turtlebot_track_01': TURTLEBOT_TRACK_01_WAYPOINTS,
+    'turtlebot_track_05': TURTLEBOT_TRACK_05_WAYPOINTS,
     'vary_track_width_new': VARY_TRACK_WIDTH_NEW_WAYPOINTS,
 }
