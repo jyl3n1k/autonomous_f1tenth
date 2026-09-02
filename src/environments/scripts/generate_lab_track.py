@@ -23,30 +23,33 @@ SAMPLES_PER_CONTROL_POINT = 10
 # Coordinates are metres, with +y pointing from the left-side start toward the
 # far end of the room.
 CONTROL_POINTS = (
-    (0.66, 0.78),
-    (0.56, 2.20),
-    (0.55, 4.85),
-    (0.90, 5.52),
-    (2.20, 5.72),
-    (3.42, 5.52),
-    (3.78, 4.92),
-    (3.65, 4.20),
-    (3.18, 3.78),
-    (1.68, 3.76),
-    (1.30, 3.38),
-    (1.36, 2.96),
-    (1.78, 2.66),
-    (3.08, 2.65),
-    (3.50, 2.26),
-    (3.45, 1.32),
-    (3.08, 0.86),
-    (2.66, 0.80),
-    (2.29, 1.08),
-    (2.16, 1.55),
-    (1.80, 1.88),
-    (1.10, 1.91),
-    (0.72, 1.58),
+    # Bottom straight leading into the outer boundary.
+    (1.52, 0.66),
+    (0.72, 0.66),
+    (0.43, 1.08),
+    (0.48, 4.92),
+    (0.85, 5.53),
+    (2.12, 5.72),
+    (3.50, 5.62),
+    (3.91, 5.18),
+    (3.96, 4.58),
+    # Upper finger: travel left, curl around its end, then return right.
+    (3.63, 4.22),
+    (1.62, 4.22),
+    (1.30, 3.91),
+    (1.31, 3.48),
+    (1.64, 3.18),
+    # Middle finger and the long descent along the right side.
+    (3.53, 3.17),
+    (3.88, 2.84),
+    (4.00, 1.35),
+    (3.70, 0.82),
+    # Return along the bottom to close the circuit.
+    (2.55, 0.66),
+    (1.72, 0.66),
 )
+
+RECOMMENDED_SPAWN = (1.52, 0.66, math.pi)
 
 
 def _catmull_rom_point(p0, p1, p2, p3, t):
@@ -236,7 +239,11 @@ def main():
     print(f'Wrote {output}')
     print(f'Floor: {FLOOR_SIZE[0]:.2f} m x {FLOOR_SIZE[1]:.2f} m')
     print(f'Clear lane width: {LANE_WIDTH:.2f} m')
-    print('Recommended spawn: x=0.66 y=0.78 yaw=1.5708')
+    spawn_x, spawn_y, spawn_yaw = RECOMMENDED_SPAWN
+    print(
+        f'Recommended spawn: x={spawn_x:.2f} '
+        f'y={spawn_y:.2f} yaw={spawn_yaw:.4f}'
+    )
 
 
 if __name__ == '__main__':

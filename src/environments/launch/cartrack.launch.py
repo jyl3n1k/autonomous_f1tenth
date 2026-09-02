@@ -52,6 +52,8 @@ def launch(context, *args, **kwargs):
         ],
         output='screen',
     )
+    # Avoid placing the legacy 0.5 m goal cube in this compact lab replica.
+    goal_actions = [] if track == 'lab_track' else [goal]
 
     if robot_model == 'f1tenth':
         pkg_f1tenth_bringup = get_package_share_directory('f1tenth_bringup')
@@ -63,7 +65,7 @@ def launch(context, *args, **kwargs):
                 'world': 'empty'
             }.items()
         )
-        return [gz_sim, robot, goal, reset]
+        return [gz_sim, robot, *goal_actions, reset]
 
     if robot_model == 'turtlebot3_burger_cam':
         if car_name != 'turtlebot3':
@@ -113,7 +115,14 @@ def launch(context, *args, **kwargs):
             arguments=['/turtlebot3/camera/image_raw'],
             output='screen',
         )
-        return [gz_sim, robot, robot_bridge, image_bridge, goal, reset]
+        return [
+            gz_sim,
+            robot,
+            robot_bridge,
+            image_bridge,
+            *goal_actions,
+            reset,
+        ]
 
     raise RuntimeError(
         f"Unsupported robot_model '{robot_model}'. "
