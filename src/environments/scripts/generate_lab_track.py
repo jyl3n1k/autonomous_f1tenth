@@ -17,36 +17,74 @@ FLOOR_SIZE = (4.40, 6.40)
 LANE_WIDTH = 0.72
 WALL_THICKNESS = 0.09
 WALL_HEIGHT = 0.15
-SAMPLES_PER_CONTROL_POINT = 10
+SAMPLES_PER_CONTROL_POINT = 12
 
-# A closed centerline approximating the compact hairpins in the physical lab.
-# Coordinates are metres, with +y pointing from the left-side start toward the
-# far end of the room.
-CONTROL_POINTS = (
-    # Bottom straight leading into the outer boundary.
-    (1.52, 0.66),
-    (0.72, 0.66),
-    (0.43, 1.08),
-    (0.48, 4.92),
-    (0.85, 5.53),
-    (2.12, 5.72),
-    (3.50, 5.62),
-    (3.91, 5.18),
-    (3.96, 4.58),
-    # Upper finger: travel left, curl around its end, then return right.
-    (3.63, 4.22),
-    (1.62, 4.22),
-    (1.30, 3.91),
-    (1.31, 3.48),
-    (1.64, 3.18),
-    # Middle finger and the long descent along the right side.
-    (3.53, 3.17),
-    (3.88, 2.84),
-    (4.00, 1.35),
-    (3.70, 0.82),
-    # Return along the bottom to close the circuit.
-    (2.55, 0.66),
-    (1.72, 0.66),
+# Barrier centerlines copied from the topology in the reference layout: one
+# outer boundary, two open divider fingers, and one lower inner loop. Defining
+# the barriers directly avoids the extra paired loops produced by offsetting a
+# closed driving centerline.
+BARRIER_PATHS = (
+    (
+        'outer',
+        (
+            (0.72, 0.42),
+            (0.38, 0.82),
+            (0.39, 5.42),
+            (0.78, 5.96),
+            (2.20, 6.05),
+            (3.60, 5.98),
+            (4.00, 5.55),
+            (4.02, 4.78),
+            (3.73, 4.33),
+            (3.43, 4.12),
+            (3.55, 3.72),
+            (3.86, 3.34),
+            (4.03, 2.70),
+            (4.02, 1.03),
+            (3.68, 0.48),
+            (2.25, 0.39),
+        ),
+        True,
+    ),
+    (
+        'upper_finger',
+        (
+            (1.35, 3.48),
+            (1.32, 3.93),
+            (1.60, 4.38),
+            (2.12, 4.63),
+            (2.78, 4.66),
+            (3.25, 4.64),
+        ),
+        False,
+    ),
+    (
+        'middle_finger',
+        (
+            (2.02, 3.55),
+            (2.48, 3.55),
+            (3.02, 3.55),
+            (3.43, 3.57),
+        ),
+        False,
+    ),
+    (
+        'inner_loop',
+        (
+            (1.36, 3.43),
+            (1.38, 2.75),
+            (1.34, 1.35),
+            (1.68, 0.98),
+            (2.42, 0.91),
+            (3.08, 0.98),
+            (3.39, 1.37),
+            (3.38, 2.31),
+            (3.11, 2.79),
+            (2.53, 3.02),
+            (1.72, 3.00),
+        ),
+        True,
+    ),
 )
 
 RECOMMENDED_SPAWN = (1.52, 0.66, math.pi)
@@ -78,14 +116,21 @@ def _catmull_rom_point(p0, p1, p2, p3, t):
     return tuple(values)
 
 
-def _sample_centerline():
+def _sample_path(control_points, closed):
     points = []
-    count = len(CONTROL_POINTS)
-    for index in range(count):
-        p0 = CONTROL_POINTS[(index - 1) % count]
-        p1 = CONTROL_POINTS[index]
-        p2 = CONTROL_POINTS[(index + 1) % count]
-        p3 = CONTROL_POINTS[(index + 2) % count]
+    count = len(control_points)
+    segment_count = count if closed else count - 1
+    for index in range(segment_count):
+        if closed:
+            p0 = control_points[(index - 1) % count]
+            p1 = control_points[index]
+            p2 = control_points[(index + 1) % count]
+            p3 = control_points[(index + 2) % count]
+        else:
+            p0 = control_points[max(0, index - 1)]
+            p1 = control_points[index]
+            p2 = control_points[index + 1]
+            p3 = control_points[min(count - 1, index + 2)]
         for sample in range(SAMPLES_PER_CONTROL_POINT):
             points.append(_catmull_rom_point(
                 p0,
@@ -94,31 +139,9 @@ def _sample_centerline():
                 p3,
                 sample / SAMPLES_PER_CONTROL_POINT,
             ))
+    if not closed:
+        points.append(control_points[-1])
     return points
-
-
-def _wall_paths(centerline):
-    half_lane = LANE_WIDTH / 2.0
-    left = []
-    right = []
-    count = len(centerline)
-    for index, point in enumerate(centerline):
-        previous = centerline[(index - 1) % count]
-        following = centerline[(index + 1) % count]
-        tangent_x = following[0] - previous[0]
-        tangent_y = following[1] - previous[1]
-        tangent_length = math.hypot(tangent_x, tangent_y)
-        normal_x = -tangent_y / tangent_length
-        normal_y = tangent_x / tangent_length
-        left.append((
-            point[0] + half_lane * normal_x,
-            point[1] + half_lane * normal_y,
-        ))
-        right.append((
-            point[0] - half_lane * normal_x,
-            point[1] - half_lane * normal_y,
-        ))
-    return left, right
 
 
 def _subelement(parent, tag, text=None, **attributes):
@@ -185,12 +208,15 @@ def _add_wall_segment(link, path_name, index, start, end):
     _add_material(visual, '0.92 0.92 0.90 1', '0.98 0.98 0.96 1')
 
 
-def _add_walls(world, paths):
+def _add_walls(world):
     model = _subelement(world, 'model', name='lab_track_walls')
     _subelement(model, 'static', 'true')
     link = _subelement(model, 'link', name='walls')
-    for path_name, path in zip(('left', 'right'), paths):
-        for index, start in enumerate(path):
+    for path_name, control_points, closed in BARRIER_PATHS:
+        path = _sample_path(control_points, closed)
+        segment_count = len(path) if closed else len(path) - 1
+        for index in range(segment_count):
+            start = path[index]
             end = path[(index + 1) % len(path)]
             _add_wall_segment(link, path_name, index, start, end)
 
@@ -226,8 +252,7 @@ def _build_world():
     _subelement(light, 'direction', '-0.25 0.15 -1.0')
 
     _add_floor(world)
-    centerline = _sample_centerline()
-    _add_walls(world, _wall_paths(centerline))
+    _add_walls(world)
     ET.indent(sdf, space='  ')
     return ET.ElementTree(sdf)
 
