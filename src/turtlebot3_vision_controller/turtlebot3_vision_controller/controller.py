@@ -23,6 +23,7 @@ class VisionCorridorController(Node):
         self._declare_parameters()
         self._bridge = CvBridge()
         self._detector = CorridorDetector(
+            detection_mode=self._parameter('detection_mode'),
             roi_top_fraction=self._parameter('roi_top_fraction'),
             max_saturation=self._parameter('max_saturation'),
             min_value=self._parameter('min_value'),
@@ -33,6 +34,7 @@ class VisionCorridorController(Node):
             sample_row_count=self._parameter('sample_row_count'),
             row_band_height=self._parameter('row_band_height'),
             min_corridor_width=self._parameter('min_corridor_width'),
+            min_wall_width=self._parameter('min_wall_width'),
         )
 
         self._kp_lateral = float(self._parameter('kp_lateral'))
@@ -93,6 +95,7 @@ class VisionCorridorController(Node):
             'debug_image_topic': '/turtlebot3/vision/debug_image',
             'debug_mask_topic': '/turtlebot3/vision/corridor_mask',
             'publish_debug': True,
+            'detection_mode': 'bright_corridor',
             'roi_top_fraction': 0.35,
             'max_saturation': 85,
             'min_value': 105,
@@ -103,6 +106,7 @@ class VisionCorridorController(Node):
             'sample_row_count': 8,
             'row_band_height': 5,
             'min_corridor_width': 8,
+            'min_wall_width': 3,
             'kp_lateral': 1.15,
             'kd_lateral': 0.08,
             'kp_heading': 1.35,
@@ -126,14 +130,20 @@ class VisionCorridorController(Node):
         self._watchdog_stopped = False
 
         try:
-            frame = self._bridge.imgmsg_to_cv2(message, desired_encoding='bgr8')
+            frame = self._bridge.imgmsg_to_cv2(
+                message,
+                desired_encoding='bgr8',
+            )
         except Exception as error:  # CvBridge exposes several exception types.
             self.get_logger().error(f'Could not convert camera image: {error}')
             self._publish_stop()
             return
 
         detection = self._detector.detect(frame)
-        if detection is None or detection.confidence < self._minimum_confidence:
+        if (
+            detection is None
+            or detection.confidence < self._minimum_confidence
+        ):
             self._publish_stop()
             if self._publish_debug:
                 self._publish_debug_images(frame, detection, message)

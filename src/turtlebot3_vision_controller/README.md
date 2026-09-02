@@ -1,7 +1,7 @@
 # TurtleBot3 vision corridor controller
 
-This package uses the simulated TurtleBot3 camera to segment the bright,
-low-saturation driving surface from the yellow track exterior. It estimates
+This package uses the simulated TurtleBot3 camera to follow either a bright
+driving surface or the gap between two bright white barriers. It estimates
 the corridor center at several look-ahead rows and publishes conservative
 `geometry_msgs/Twist` commands. It does not collect training data.
 
@@ -29,6 +29,14 @@ In a second sourced terminal:
 ros2 launch turtlebot3_vision_controller vision_controller.launch.py
 ```
 
+For `lab_track`, select the white-wall configuration instead:
+
+```bash
+ros2 launch turtlebot3_vision_controller vision_controller.launch.py \
+  config:=$(ros2 pkg prefix turtlebot3_vision_controller)/share/\
+turtlebot3_vision_controller/config/lab_track.yaml
+```
+
 Inspect what the controller detects:
 
 ```bash
@@ -36,9 +44,11 @@ ros2 run rqt_image_view rqt_image_view \
   /turtlebot3/vision/debug_image
 ```
 
-The green overlay should cover the drivable corridor, blue horizontal lines
-should span it, and green points should follow its center. Stop the controller
-with Ctrl+C before teleoperating the robot.
+With the narrow-track configuration, the green overlay covers the drivable
+surface. With the lab configuration, it covers the two white barriers. In
+both modes, blue horizontal lines should span the free corridor and green
+points should follow its center. Stop the controller with Ctrl+C before
+teleoperating the robot.
 
 ## Tuning order
 

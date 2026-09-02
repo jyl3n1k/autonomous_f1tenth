@@ -21,7 +21,7 @@ class CorridorDetection:
 
 
 class CorridorDetector:
-    """Segment and track a low-saturation, bright driving corridor."""
+    """Track either a bright floor or the gap between two bright walls."""
 
     def __init__(
         self,
@@ -35,6 +35,8 @@ class CorridorDetector:
         sample_row_count: int = 8,
         row_band_height: int = 5,
         min_corridor_width: int = 8,
+        detection_mode: str = 'bright_corridor',
+        min_wall_width: int = 3,
     ) -> None:
         self.roi_top_fraction = roi_top_fraction
         self.max_saturation = max_saturation
@@ -46,6 +48,12 @@ class CorridorDetector:
         self.sample_row_count = max(2, sample_row_count)
         self.row_band_height = max(1, row_band_height)
         self.min_corridor_width = max(2, min_corridor_width)
+        if detection_mode not in ('bright_corridor', 'white_walls'):
+            raise ValueError(
+                'detection_mode must be bright_corridor or white_walls'
+            )
+        self.detection_mode = detection_mode
+        self.min_wall_width = max(1, min_wall_width)
 
     def detect(self, bgr_image: np.ndarray) -> Optional[CorridorDetection]:
         """Return corridor geometry, or ``None`` when it is not visible."""
@@ -75,9 +83,15 @@ class CorridorDetector:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
 
-        corridor_mask = self._select_corridor_component(mask, image_width)
-        if corridor_mask is None:
-            return None
+        if self.detection_mode == 'bright_corridor':
+            detection_mask = self._select_corridor_component(
+                mask,
+                image_width,
+            )
+            if detection_mask is None:
+                return None
+        else:
+            detection_mask = mask
 
         near_row = int(np.clip(
             self.near_row_fraction * (roi_height - 1),
@@ -102,7 +116,18 @@ class CorridorDetector:
         centers_roi: list[tuple[int, int]] = []
         spans_roi: list[tuple[int, int, int]] = []
         for row in sample_rows:
-            run = self._choose_run(corridor_mask, row, expected_x)
+            if self.detection_mode == 'white_walls':
+                run = self._choose_wall_gap(
+                    detection_mask,
+                    row,
+                    expected_x,
+                )
+            else:
+                run = self._choose_run(
+                    detection_mask,
+                    row,
+                    expected_x,
+                )
             if run is None:
                 continue
             left, right = run
@@ -120,7 +145,7 @@ class CorridorDetector:
         spans = [(left, right, y + roi_top) for left, right, y in spans_roi]
 
         full_mask = np.zeros((image_height, image_width), dtype=np.uint8)
-        full_mask[roi_top:, :] = corridor_mask
+        full_mask[roi_top:, :] = detection_mask
         return CorridorDetection(
             near_center=centers[0],
             far_center=centers[-1],
@@ -196,9 +221,61 @@ class CorridorDetector:
             if width < self.min_corridor_width:
                 continue
             center = (left + right) / 2.0
-            candidates.append((abs(center - expected_x), -width, int(left), int(right)))
+            candidates.append((
+                abs(center - expected_x),
+                -width,
+                int(left),
+                int(right),
+            ))
 
         if not candidates:
             return None
         _, _, left, right = min(candidates)
+        return left, right
+
+    def _choose_wall_gap(
+        self,
+        mask: np.ndarray,
+        row: int,
+        expected_x: float,
+    ) -> Optional[tuple[int, int]]:
+        """Return the free-space gap bounded by adjacent white wall runs."""
+        half_band = self.row_band_height // 2
+        start = max(0, row - half_band)
+        stop = min(mask.shape[0], row + half_band + 1)
+        row_mask = np.any(mask[start:stop, :] > 0, axis=0).astype(np.uint8)
+
+        padded = np.pad(row_mask, (1, 1), constant_values=0)
+        changes = np.diff(padded.astype(np.int8))
+        starts = np.where(changes == 1)[0]
+        stops = np.where(changes == -1)[0] - 1
+        wall_runs = [
+            (int(left), int(right))
+            for left, right in zip(starts, stops)
+            if right - left + 1 >= self.min_wall_width
+        ]
+
+        candidates = []
+        for left_wall, right_wall in zip(wall_runs, wall_runs[1:]):
+            gap_left = left_wall[1] + 1
+            gap_right = right_wall[0] - 1
+            gap_width = gap_right - gap_left + 1
+            if gap_width < self.min_corridor_width:
+                continue
+
+            center = (gap_left + gap_right) / 2.0
+            contains_expected = gap_left <= expected_x <= gap_right
+            # Prefer the gap containing the previous center estimate. This
+            # prevents distant divider walls from stealing the detection.
+            candidates.append((
+                0 if contains_expected else 1,
+                abs(center - expected_x),
+                -gap_width,
+                gap_left,
+                gap_right,
+            ))
+
+        if not candidates:
+            return None
+        _, _, _, left, right = min(candidates)
         return left, right

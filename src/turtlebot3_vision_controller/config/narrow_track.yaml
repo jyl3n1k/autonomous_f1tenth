@@ -10,6 +10,7 @@ turtlebot3_vision_controller:
 
     # The narrow-track floor is bright and low-saturation; the exterior is
     # yellow. Adjust these first if the green debug overlay misses the floor.
+    detection_mode: bright_corridor
     roi_top_fraction: 0.35
     max_saturation: 85
     min_value: 105
@@ -21,6 +22,7 @@ turtlebot3_vision_controller:
     sample_row_count: 8
     row_band_height: 5
     min_corridor_width: 8
+    min_wall_width: 3
     minimum_confidence: 0.50
 
     kp_lateral: 1.15

@@ -1,0 +1,38 @@
+turtlebot3_vision_controller:
+  ros__parameters:
+    use_sim_time: true
+
+    camera_topic: /turtlebot3/camera/image_raw
+    command_topic: /turtlebot3/cmd_vel
+    debug_image_topic: /turtlebot3/vision/debug_image
+    debug_mask_topic: /turtlebot3/vision/corridor_mask
+    publish_debug: true
+
+    # The lab replica has bright white barriers on a dark gray floor. Detect
+    # the two wall runs and follow the free-space gap between them.
+    detection_mode: white_walls
+    roi_top_fraction: 0.32
+    max_saturation: 55
+    min_value: 165
+    morphology_kernel: 3
+    min_component_area: 150
+
+    near_row_fraction: 0.88
+    far_row_fraction: 0.42
+    sample_row_count: 10
+    row_band_height: 5
+    min_corridor_width: 12
+    min_wall_width: 2
+    minimum_confidence: 0.50
+
+    kp_lateral: 1.10
+    kd_lateral: 0.06
+    kp_heading: 1.45
+    steering_smoothing: 0.42
+
+    # Start slowly because the lab layout contains consecutive tight turns.
+    max_linear_speed: 0.14
+    min_linear_speed: 0.045
+    max_angular_speed: 1.60
+    turn_slowdown: 0.72
+    image_timeout: 0.50
