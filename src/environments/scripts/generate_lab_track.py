@@ -17,7 +17,10 @@ FLOOR_SIZE = (4.40, 6.40)
 LANE_WIDTH = 0.72
 WALL_THICKNESS = 0.09
 WALL_HEIGHT = 0.15
-SAMPLES_PER_CONTROL_POINT = 12
+# Keep curved barriers visually smooth at TurtleBot scale.  Twenty-four
+# samples puts adjacent box centers roughly 2--5 cm apart through the tight
+# bends while preserving the measured control-point geometry.
+SAMPLES_PER_CONTROL_POINT = 24
 
 # Barrier centerlines copied from the topology in the reference layout: one
 # outer boundary, two open divider fingers, and one lower inner loop. Defining
