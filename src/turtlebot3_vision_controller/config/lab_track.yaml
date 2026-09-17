@@ -3,36 +3,43 @@ turtlebot3_vision_controller:
     use_sim_time: true
 
     camera_topic: /turtlebot3/camera/image_raw
+    scan_topic: /turtlebot3/scan
     command_topic: /turtlebot3/cmd_vel
     debug_image_topic: /turtlebot3/vision/debug_image
     debug_mask_topic: /turtlebot3/vision/corridor_mask
     publish_debug: true
 
-    # The lab replica has bright white barriers on a dark gray floor. Detect
-    # the two wall runs and follow the free-space gap between them.
-    detection_mode: white_walls
-    roi_top_fraction: 0.32
+    # Select the dark floor component enclosed by the bright lab barriers.
+    # Unlike pairing wall runs, this remains continuous through tight bends.
+    detection_mode: dark_corridor
+    roi_top_fraction: 0.48
     max_saturation: 55
     min_value: 165
     morphology_kernel: 3
     min_component_area: 150
 
-    near_row_fraction: 0.88
-    far_row_fraction: 0.42
+    near_row_fraction: 0.65
+    far_row_fraction: 0.15
     sample_row_count: 10
     row_band_height: 5
     min_corridor_width: 12
     min_wall_width: 2
     minimum_confidence: 0.50
 
-    kp_lateral: 1.10
-    kd_lateral: 0.06
-    kp_heading: 1.45
-    steering_smoothing: 0.42
+    kp_lateral: 1.05
+    kd_lateral: 0.08
+    kp_heading: 1.20
+    steering_smoothing: 0.25
 
-    # Start slowly because the lab layout contains consecutive tight turns.
-    max_linear_speed: 0.14
-    min_linear_speed: 0.045
-    max_angular_speed: 1.60
-    turn_slowdown: 0.72
+    # The camera supplies the nominal centerline. LiDAR is used only to slow,
+    # stop, and bias the turn when a tight bend puts a wall directly ahead.
+    use_lidar_safety: true
+    lidar_stop_distance: 0.20
+    lidar_slow_distance: 0.48
+    lidar_corner_gain: 0.0
+
+    max_linear_speed: 0.06
+    min_linear_speed: 0.025
+    max_angular_speed: 1.20
+    turn_slowdown: 0.90
     image_timeout: 0.50

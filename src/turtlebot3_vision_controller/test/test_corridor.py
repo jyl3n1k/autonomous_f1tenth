@@ -47,6 +47,21 @@ def make_white_wall_track(offset_near=0, offset_far=0, right_wall=True):
     return image
 
 
+def make_dark_floor_track(offset_near=0, offset_far=0):
+    image = np.full((240, 320, 3), 245, dtype=np.uint8)
+    polygon = np.array(
+        [
+            [115 + offset_far, 70],
+            [205 + offset_far, 70],
+            [270 + offset_near, 239],
+            [50 + offset_near, 239],
+        ],
+        dtype=np.int32,
+    )
+    cv2.fillPoly(image, [polygon], (155, 155, 155))
+    return image
+
+
 def test_detects_centered_corridor():
     detection = CorridorDetector().detect(make_track())
 
@@ -115,3 +130,17 @@ def test_white_wall_mode_stops_when_one_boundary_is_missing():
     assert detector.detect(
         make_white_wall_track(right_wall=False)
     ) is None
+
+
+def test_dark_corridor_mode_follows_lab_floor():
+    detector = CorridorDetector(
+        detection_mode='dark_corridor',
+        min_value=165,
+        max_saturation=55,
+    )
+
+    detection = detector.detect(make_dark_floor_track(offset_far=25))
+
+    assert detection is not None
+    assert abs(detection.near_center[0] - 160) < 5
+    assert detection.far_center[0] > detection.near_center[0]

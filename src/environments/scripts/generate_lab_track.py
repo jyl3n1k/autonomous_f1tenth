@@ -16,7 +16,9 @@ WORLD_NAME = 'empty'  # cartrack.launch.py bridges services under this name.
 FLOOR_SIZE = (4.40, 6.40)
 LANE_WIDTH = 0.72
 WALL_THICKNESS = 0.09
-WALL_HEIGHT = 0.15
+# Both sensors must see the barriers: the TurtleBot LDS is around 0.17 m and
+# the camera optical center is around 0.20 m above the floor.
+WALL_HEIGHT = 0.25
 # Keep curved barriers visually smooth at TurtleBot scale.  Twenty-four
 # samples puts adjacent box centers roughly 2--5 cm apart through the tight
 # bends while preserving the measured control-point geometry.
@@ -90,7 +92,7 @@ BARRIER_PATHS = (
     ),
 )
 
-RECOMMENDED_SPAWN = (1.52, 0.66, math.pi)
+RECOMMENDED_SPAWN = (1.52, 0.66, 0.0)
 
 
 def _catmull_rom_point(p0, p1, p2, p3, t):
@@ -154,11 +156,13 @@ def _subelement(parent, tag, text=None, **attributes):
     return element
 
 
-def _add_material(visual, ambient, diffuse):
+def _add_material(visual, ambient, diffuse, emissive=None):
     material = _subelement(visual, 'material')
     _subelement(material, 'ambient', ambient)
     _subelement(material, 'diffuse', diffuse)
     _subelement(material, 'specular', '0.15 0.15 0.15 1')
+    if emissive is not None:
+        _subelement(material, 'emissive', emissive)
 
 
 def _add_box_geometry(parent, size):
@@ -208,7 +212,12 @@ def _add_wall_segment(link, path_name, index, start, end):
     )
     _subelement(visual, 'pose', pose)
     _add_box_geometry(visual, size)
-    _add_material(visual, '0.92 0.92 0.90 1', '0.98 0.98 0.96 1')
+    _add_material(
+        visual,
+        '0.92 0.92 0.90 1',
+        '0.98 0.98 0.96 1',
+        '0.72 0.72 0.70 1',
+    )
 
 
 def _add_walls(world):

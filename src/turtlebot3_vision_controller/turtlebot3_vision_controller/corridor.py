@@ -48,9 +48,14 @@ class CorridorDetector:
         self.sample_row_count = max(2, sample_row_count)
         self.row_band_height = max(1, row_band_height)
         self.min_corridor_width = max(2, min_corridor_width)
-        if detection_mode not in ('bright_corridor', 'white_walls'):
+        if detection_mode not in (
+            'bright_corridor',
+            'dark_corridor',
+            'white_walls',
+        ):
             raise ValueError(
-                'detection_mode must be bright_corridor or white_walls'
+                'detection_mode must be bright_corridor, dark_corridor, '
+                'or white_walls'
             )
         self.detection_mode = detection_mode
         self.min_wall_width = max(1, min_wall_width)
@@ -83,7 +88,9 @@ class CorridorDetector:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
 
-        if self.detection_mode == 'bright_corridor':
+        if self.detection_mode in ('bright_corridor', 'dark_corridor'):
+            if self.detection_mode == 'dark_corridor':
+                mask = cv2.bitwise_not(mask)
             detection_mask = self._select_corridor_component(
                 mask,
                 image_width,

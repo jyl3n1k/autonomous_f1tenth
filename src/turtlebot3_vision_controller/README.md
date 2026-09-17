@@ -29,13 +29,30 @@ In a second sourced terminal:
 ros2 launch turtlebot3_vision_controller vision_controller.launch.py
 ```
 
-For `lab_track`, select the white-wall configuration instead:
+For `lab_track`, use the lab-specific world and controller configuration:
+
+```bash
+ros2 launch environments cartrack.launch.py \
+  track:=lab_track \
+  robot_model:=turtlebot3_burger_cam \
+  car_name:=turtlebot3 \
+  spawn_x:=1.52 \
+  spawn_y:=0.66 \
+  spawn_yaw:=0.0
+```
+
+Then launch its controller configuration:
 
 ```bash
 ros2 launch turtlebot3_vision_controller vision_controller.launch.py \
   config:=$(ros2 pkg prefix turtlebot3_vision_controller)/share/\
 turtlebot3_vision_controller/config/lab_track.yaml
 ```
+
+The lab configuration follows the dark floor enclosed by the white barriers
+and uses the TurtleBot LiDAR as a close-wall safety layer. It slows as a wall
+approaches, turns toward the more open side at tight bends, and permits a
+complete stop inside the configured safety distance.
 
 Inspect what the controller detects:
 

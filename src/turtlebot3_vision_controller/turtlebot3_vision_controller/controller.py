@@ -9,7 +9,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, LaserScan
 
 from .corridor import CorridorDetection, CorridorDetector
 
@@ -48,8 +48,17 @@ class VisionCorridorController(Node):
         self._minimum_confidence = float(self._parameter('minimum_confidence'))
         self._image_timeout = float(self._parameter('image_timeout'))
         self._publish_debug = bool(self._parameter('publish_debug'))
+        self._use_lidar_safety = bool(self._parameter('use_lidar_safety'))
+        self._lidar_stop_distance = float(
+            self._parameter('lidar_stop_distance')
+        )
+        self._lidar_slow_distance = float(
+            self._parameter('lidar_slow_distance')
+        )
+        self._lidar_corner_gain = float(self._parameter('lidar_corner_gain'))
 
         camera_topic = str(self._parameter('camera_topic'))
+        scan_topic = str(self._parameter('scan_topic'))
         command_topic = str(self._parameter('command_topic'))
         debug_image_topic = str(self._parameter('debug_image_topic'))
         debug_mask_topic = str(self._parameter('debug_mask_topic'))
@@ -62,17 +71,24 @@ class VisionCorridorController(Node):
         self._debug_image_publisher = self.create_publisher(
             Image,
             debug_image_topic,
-            qos_profile_sensor_data,
+            10,
         )
         self._debug_mask_publisher = self.create_publisher(
             Image,
             debug_mask_topic,
-            qos_profile_sensor_data,
+            10,
         )
         self._image_subscription = self.create_subscription(
             Image,
             camera_topic,
             self._image_callback,
+            qos_profile_sensor_data,
+        )
+        self._latest_scan: Optional[LaserScan] = None
+        self._scan_subscription = self.create_subscription(
+            LaserScan,
+            scan_topic,
+            self._scan_callback,
             qos_profile_sensor_data,
         )
 
@@ -91,6 +107,7 @@ class VisionCorridorController(Node):
     def _declare_parameters(self) -> None:
         parameters = {
             'camera_topic': '/turtlebot3/camera/image_raw',
+            'scan_topic': '/turtlebot3/scan',
             'command_topic': '/turtlebot3/cmd_vel',
             'debug_image_topic': '/turtlebot3/vision/debug_image',
             'debug_mask_topic': '/turtlebot3/vision/corridor_mask',
@@ -117,12 +134,19 @@ class VisionCorridorController(Node):
             'turn_slowdown': 0.72,
             'minimum_confidence': 0.50,
             'image_timeout': 0.50,
+            'use_lidar_safety': False,
+            'lidar_stop_distance': 0.20,
+            'lidar_slow_distance': 0.48,
+            'lidar_corner_gain': 1.20,
         }
         for name, default in parameters.items():
             self.declare_parameter(name, default)
 
     def _parameter(self, name: str):
         return self.get_parameter(name).value
+
+    def _scan_callback(self, message: LaserScan) -> None:
+        self._latest_scan = message
 
     def _image_callback(self, message: Image) -> None:
         now = self.get_clock().now()
@@ -210,6 +234,9 @@ class VisionCorridorController(Node):
             + (1.0 - alpha) * self._previous_angular_command
         )
 
+        if self._use_lidar_safety:
+            angular = self._lidar_assisted_angular(angular)
+
         turn_ratio = abs(angular) / max(self._max_angular_speed, 1e-6)
         linear = self._max_linear_speed * (
             1.0 - self._turn_slowdown * turn_ratio
@@ -220,6 +247,8 @@ class VisionCorridorController(Node):
             self._min_linear_speed,
             self._max_linear_speed,
         ))
+        if self._use_lidar_safety:
+            linear *= self._lidar_speed_scale()
 
         command = Twist()
         command.linear.x = linear
@@ -227,6 +256,82 @@ class VisionCorridorController(Node):
         self._previous_lateral_error = lateral_error
         self._previous_angular_command = angular
         return command, lateral_error, heading_error
+
+    def _scan_sector_min(self, start_angle: float, end_angle: float) -> float:
+        """Return the nearest finite LiDAR return in an angular sector."""
+        scan = self._latest_scan
+        if scan is None or not scan.ranges or scan.angle_increment == 0.0:
+            return float('inf')
+
+        angles = (
+            scan.angle_min
+            + np.arange(len(scan.ranges)) * scan.angle_increment
+        )
+        # Gazebo's TurtleBot scan is encoded from 0 to 2*pi. Normalize it so
+        # sectors crossing the robot's right side can use conventional
+        # negative angles.
+        angles = (angles + np.pi) % (2.0 * np.pi) - np.pi
+        ranges = np.asarray(scan.ranges, dtype=float)
+        valid = (
+            np.isfinite(ranges)
+            & (ranges >= max(0.0, scan.range_min))
+            & (ranges <= scan.range_max)
+            & (angles >= start_angle)
+            & (angles <= end_angle)
+        )
+        if not np.any(valid):
+            return float('inf')
+        return float(np.min(ranges[valid]))
+
+    def _front_clearance(self) -> float:
+        return self._scan_sector_min(np.deg2rad(-24), np.deg2rad(24))
+
+    def _lidar_speed_scale(self) -> float:
+        """Slow continuously, and stop completely, near a frontal wall."""
+        front = self._front_clearance()
+        if not np.isfinite(front):
+            return 1.0
+        if front <= self._lidar_stop_distance:
+            return 0.0
+        distance_span = max(
+            1e-6,
+            self._lidar_slow_distance - self._lidar_stop_distance,
+        )
+        return float(np.clip(
+            (front - self._lidar_stop_distance) / distance_span,
+            0.0,
+            1.0,
+        ))
+
+    def _lidar_assisted_angular(self, vision_angular: float) -> float:
+        """Bias the vision command toward the open side of a tight corner."""
+        front = self._front_clearance()
+        if not np.isfinite(front) or front >= self._lidar_slow_distance:
+            return vision_angular
+
+        left = self._scan_sector_min(np.deg2rad(18), np.deg2rad(82))
+        right = self._scan_sector_min(np.deg2rad(-82), np.deg2rad(-18))
+        if not np.isfinite(left) and not np.isfinite(right):
+            return vision_angular
+
+        # Positive angular.z turns left. Prefer the side with more clearance.
+        left_score = left if np.isfinite(left) else self._lidar_slow_distance
+        right_score = right if np.isfinite(right) else self._lidar_slow_distance
+        direction = float(np.sign(left_score - right_score))
+        proximity = 1.0 - float(np.clip(
+            (front - self._lidar_stop_distance)
+            / max(1e-6, self._lidar_slow_distance - self._lidar_stop_distance),
+            0.0,
+            1.0,
+        ))
+        assisted = vision_angular + (
+            direction * self._lidar_corner_gain * proximity
+        )
+        return float(np.clip(
+            assisted,
+            -self._max_angular_speed,
+            self._max_angular_speed,
+        ))
 
     def _publish_debug_images(
         self,
