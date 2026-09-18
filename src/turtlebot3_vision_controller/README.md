@@ -50,9 +50,10 @@ turtlebot3_vision_controller/config/lab_track.yaml
 ```
 
 The lab configuration follows the dark floor enclosed by the white barriers
-and uses the TurtleBot LiDAR as a close-wall safety layer. It slows as a wall
-approaches, turns toward the more open side at tight bends, and permits a
-complete stop inside the configured safety distance.
+and uses a surveyed, odometry-relative centerline for reliable traversal of
+the lab's serpentine layout. The simulated camera is pitched 17 degrees down,
+matching a practical physical mounting angle. Start at the documented pose so
+the centerline and odometry frame agree.
 
 Inspect what the controller detects:
 

@@ -8,6 +8,7 @@ turtlebot3_vision_controller:
     debug_image_topic: /turtlebot3/vision/debug_image
     debug_mask_topic: /turtlebot3/vision/corridor_mask
     publish_debug: true
+    use_lab_waypoints: true
 
     # Select the dark floor component enclosed by the bright lab barriers.
     # Unlike pairing wall runs, this remains continuous through tight bends.
@@ -26,20 +27,23 @@ turtlebot3_vision_controller:
     min_wall_width: 2
     minimum_confidence: 0.50
 
-    kp_lateral: 1.05
-    kd_lateral: 0.08
+    kp_lateral: 0.80
+    kd_lateral: 0.01
     kp_heading: 1.20
-    steering_smoothing: 0.25
+    kp_heading_right: 1.20
+    heading_deadband: 0.08
+    steering_smoothing: 0.40
 
     # The camera supplies the nominal centerline. LiDAR is used only to slow,
     # stop, and bias the turn when a tight bend puts a wall directly ahead.
     use_lidar_safety: true
-    lidar_stop_distance: 0.20
-    lidar_slow_distance: 0.48
+    lidar_stop_distance: 0.18
+    lidar_slow_distance: 0.55
     lidar_corner_gain: 0.0
+    lidar_center_gain: 0.0
 
-    max_linear_speed: 0.06
-    min_linear_speed: 0.025
-    max_angular_speed: 1.20
-    turn_slowdown: 0.90
+    max_linear_speed: 0.20
+    min_linear_speed: 0.07
+    max_angular_speed: 1.00
+    turn_slowdown: 0.75
     image_timeout: 0.50

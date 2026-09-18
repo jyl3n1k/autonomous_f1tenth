@@ -416,7 +416,10 @@
     <joint name="camera_joint" type="fixed">
       <parent>base_link</parent>
       <child>camera_link</child>
-      <pose>0.040 -0.000 0.110 0 0 0</pose>
+      <!-- Pitch the camera 17 degrees toward the floor. This matches a
+           practical corridor-following mount and keeps both boundaries in
+           view through the compact lab turns. -->
+      <pose>0.040 -0.000 0.110 0 0.30 0</pose>
       <axis>
         <xyz>0 0 1</xyz>
       </axis>
