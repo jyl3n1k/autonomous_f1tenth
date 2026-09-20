@@ -21,12 +21,14 @@ def launch(context, *args, **kwargs):
     spawn_x = LaunchConfiguration('spawn_x').perform(context)
     spawn_y = LaunchConfiguration('spawn_y').perform(context)
     spawn_yaw = LaunchConfiguration('spawn_yaw').perform(context)
+    headless = LaunchConfiguration('headless_rendering').perform(context)
+    render_args = ' --headless-rendering' if headless.lower() == 'true' else ''
     
     gz_sim = IncludeLaunchDescription(
         launch_description_source=PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
         launch_arguments={
-            'gz_args': f'-s -r {pkg_environments}/worlds/{track}.sdf',
+            'gz_args': f'-s -r{render_args} {pkg_environments}/worlds/{track}.sdf',
         }.items()
     )
 
@@ -198,6 +200,7 @@ def generate_launch_description():
         spawn_x,
         spawn_y,
         spawn_yaw,
+        DeclareLaunchArgument('headless_rendering', default_value='false'),
         OpaqueFunction(function=launch),
         service_bridge,
         stepping_service,

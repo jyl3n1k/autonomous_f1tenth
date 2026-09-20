@@ -5,6 +5,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -27,7 +28,21 @@ def generate_launch_description():
         executable='vision_controller',
         name='turtlebot3_vision_controller',
         output='screen',
-        parameters=[LaunchConfiguration('config')],
+        parameters=[LaunchConfiguration('config'), {
+            'reverse_route': ParameterValue(
+                LaunchConfiguration('reverse_route'), value_type=bool),
+            'waypoint_origin_yaw': ParameterValue(
+                LaunchConfiguration('waypoint_origin_yaw'), value_type=float),
+        }],
     )
 
-    return LaunchDescription([config_argument, controller])
+    return LaunchDescription([
+        config_argument,
+        DeclareLaunchArgument(
+            'reverse_route', default_value='false',
+            description='Follow the stored route in the opposite direction'),
+        DeclareLaunchArgument(
+            'waypoint_origin_yaw', default_value='0.0',
+            description='Must match the simulator spawn_yaw, in radians'),
+        controller,
+    ])

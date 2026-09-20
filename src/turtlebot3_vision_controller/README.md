@@ -36,8 +36,8 @@ ros2 launch environments cartrack.launch.py \
   track:=lab_track \
   robot_model:=turtlebot3_burger_cam \
   car_name:=turtlebot3 \
-  spawn_x:=1.52 \
-  spawn_y:=0.66 \
+  spawn_x:=2.20 \
+  spawn_y:=0.65 \
   spawn_yaw:=0.0
 ```
 
@@ -49,11 +49,32 @@ ros2 launch turtlebot3_vision_controller vision_controller.launch.py \
 turtlebot3_vision_controller/config/lab_track.yaml
 ```
 
-The lab configuration follows the dark floor enclosed by the white barriers
-and uses a surveyed, odometry-relative centerline for reliable traversal of
-the lab's serpentine layout. The simulated camera is pitched 17 degrees down,
-matching a practical physical mounting angle. Start at the documented pose so
-the centerline and odometry frame agree.
+The lab configuration uses the surveyed route with wheel distance and IMU
+heading. The camera detector runs for diagnostics; **this configuration does
+not steer from camera pixels**. Set `use_lab_waypoints: false` and
+`use_imu_heading: false` to experiment with camera steering. Camera-only lap
+completion is not established by the route-assisted tests.
+
+Start the robot and controller at the documented pose so the route and sensor
+frames agree. Restart the simulator as well as the controller after updating:
+the lab world now enables the IMU system. Rebuild with:
+
+```bash
+colcon build --packages-select environments turtlebot3_vision_controller --symlink-install
+source install/setup.bash
+```
+
+The lab follower uses a continuous 0.22 m lookahead instead of switching between
+targets 5–8 cm away. It limits linear and angular acceleration, uses IMU heading
+to reduce wheel-odometry drift, and applies LiDAR slowdown in route mode too.
+The 0.14 m stop threshold is above the scanner's 0.12 m minimum range. Sensor
+timeouts stop motion, and emergency braking bypasses acceleration smoothing.
+Route-assisted operation waits for camera, scan, odometry and IMU messages.
+The debug image identifies the active mode (`ROUTE`, `CAMERA`, or recovery).
+
+For testing without a desktop renderer, append `headless_rendering:=true` to
+the environment launch command. Keep only one Gazebo server per `GZ_PARTITION`
+and one controller per command topic.
 
 Inspect what the controller detects:
 
@@ -78,3 +99,35 @@ teleoperating the robot.
 4. Increase `max_linear_speed` only after all six narrow tracks run reliably.
 
 All defaults are in `config/narrow_track.yaml`.
+
+## Repeat the simulation test
+
+Use a separate `ROS_DOMAIN_ID` and `GZ_PARTITION` in **every** test terminal,
+then launch the lab simulator at the documented start pose. Do not launch the
+normal controller as well: the evaluation script starts one itself.
+
+```bash
+export ROS_DOMAIN_ID=76
+export GZ_PARTITION=lab_evaluation
+source install/setup.bash
+```
+
+In another terminal with the same environment, bridge simulator ground truth
+for measurement (it is not used by the controller):
+
+```bash
+ros2 run ros_gz_bridge parameter_bridge \
+  '/world/empty/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V'
+```
+
+Then, in another identically configured terminal:
+
+```bash
+python3 scripts/evaluate_lab_controller.py --duration 250 --output /tmp/lab-run.csv
+python3 scripts/plot_lab_evaluation.py /tmp/lab-run.csv --output /tmp/lab-run.png
+```
+
+The test writes CSV commands/trajectory and a JSON summary, and stops the
+robot on exit. Lap counting uses actual simulator position, not wheel odometry;
+the latter can keep advancing while the robot is pressed against a wall.
+The ground-truth bridge assumes this lab world's single dynamic robot.

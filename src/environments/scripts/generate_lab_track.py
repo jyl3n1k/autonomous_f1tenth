@@ -92,7 +92,7 @@ BARRIER_PATHS = (
     ),
 )
 
-RECOMMENDED_SPAWN = (1.52, 0.66, 0.0)
+RECOMMENDED_SPAWN = (2.20, 0.65, 0.0)
 
 
 def _catmull_rom_point(p0, p1, p2, p3, t):
@@ -245,6 +245,7 @@ def _build_world():
     for filename, name in (
         ('gz-sim-physics-system', 'gz::sim::systems::Physics'),
         ('gz-sim-sensors-system', 'gz::sim::systems::Sensors'),
+        ('gz-sim-imu-system', 'gz::sim::systems::Imu'),
         ('gz-sim-user-commands-system', 'gz::sim::systems::UserCommands'),
         ('gz-sim-scene-broadcaster-system', 'gz::sim::systems::SceneBroadcaster'),
     ):

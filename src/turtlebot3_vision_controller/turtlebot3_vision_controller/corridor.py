@@ -59,6 +59,10 @@ class CorridorDetector:
             )
         self.detection_mode = detection_mode
         self.min_wall_width = max(1, min_wall_width)
+        # The compact lab course can push one boundary outside the camera
+        # image in a bend.  Retain a nominal pixel gap for that brief case.
+        self._last_gap_width: Optional[float] = None
+        self._last_center_x: Optional[float] = None
 
     def detect(self, bgr_image: np.ndarray) -> Optional[CorridorDetection]:
         """Return corridor geometry, or ``None`` when it is not visible."""
@@ -119,9 +123,14 @@ class CorridorDetector:
             self.sample_row_count,
         ).astype(int)
 
-        expected_x = image_width / 2.0
+        expected_x = (
+            self._last_center_x
+            if self._last_center_x is not None
+            else image_width / 2.0
+        )
         centers_roi: list[tuple[int, int]] = []
         spans_roi: list[tuple[int, int, int]] = []
+        bounded_rows = 0
         for row in sample_rows:
             if self.detection_mode == 'white_walls':
                 run = self._choose_wall_gap(
@@ -138,14 +147,33 @@ class CorridorDetector:
             if run is None:
                 continue
             left, right = run
+            if self.detection_mode == 'white_walls':
+                self._last_gap_width = float(right - left + 1)
+            if (
+                self.detection_mode == 'dark_corridor'
+                and left <= 1
+                and right >= image_width - 2
+            ):
+                # Unbounded dark floor is not a valid lab corridor. This
+                # prevents the exterior floor from becoming a false track.
+                continue
             center_x = int(round((left + right) / 2.0))
             centers_roi.append((center_x, int(row)))
             spans_roi.append((left, right, int(row)))
+            if left > 1 and right < image_width - 2:
+                bounded_rows += 1
             expected_x = center_x
 
         minimum_rows = max(3, int(np.ceil(self.sample_row_count * 0.5)))
         if len(centers_roi) < minimum_rows:
             return None
+        if self.detection_mode == 'dark_corridor' and bounded_rows < 2:
+            return None
+
+        # The near sample is the best estimate of the robot's current lane
+        # center.  Do not let a far divider overwrite it for one-wall holds.
+        if centers_roi:
+            self._last_center_x = float(centers_roi[0][0])
 
         confidence = len(centers_roi) / float(self.sample_row_count)
         centers = [(x, y + roi_top) for x, y in centers_roi]
@@ -283,6 +311,30 @@ class CorridorDetector:
             ))
 
         if not candidates:
-            return None
+            # If only one wall is visible, use the previous gap width and the
+            # image edge as a temporary virtual boundary.  This keeps the
+            # robot moving away from the visible wall instead of stopping at
+            # every bend where the opposite wall leaves the frame.
+            if len(wall_runs) != 1:
+                return None
+            wall_left, wall_right = wall_runs[0]
+            # Only infer a missing boundary when the visible wall itself is
+            # clipped by the image edge.  An isolated wall in the middle of
+            # the frame is not enough evidence to drive.
+            if wall_left != 0 and wall_right != mask.shape[1] - 1:
+                return None
+            if wall_left == 0 and wall_right == mask.shape[1] - 1:
+                return None
+            gap_width = self._last_gap_width
+            if gap_width is None:
+                gap_width = mask.shape[1] * 0.65
+            # Do not infer a turn from the clipped wall location.  Preserve
+            # the last midpoint until both boundaries are visible again.
+            center = self._last_center_x
+            if center is None:
+                center = expected_x
+            gap_left = int(round(center - gap_width / 2.0))
+            gap_right = int(round(center + gap_width / 2.0 - 1.0))
+            return max(0, gap_left), min(mask.shape[1] - 1, gap_right)
         _, _, _, left, right = min(candidates)
         return left, right

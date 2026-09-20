@@ -8,38 +8,55 @@ turtlebot3_vision_controller:
     debug_image_topic: /turtlebot3/vision/debug_image
     debug_mask_topic: /turtlebot3/vision/corridor_mask
     publish_debug: true
+    # Route-assisted mode: steering follows the surveyed centerline using
+    # odometry; the camera detector runs for diagnostics. Set false to use
+    # camera steering. This is not a camera-only controller configuration.
     use_lab_waypoints: true
+    waypoint_recovery: false
+    # Must match the pose used by cartrack.launch.py.
+    waypoint_origin_x: 2.20
+    waypoint_origin_y: 0.65
+    waypoint_lookahead: 0.22
+    # Correct wheel-heading drift with the robot's IMU, never Gazebo truth.
+    use_imu_heading: true
+    max_linear_acceleration: 0.20
+    max_angular_acceleration: 1.50
+    sensor_timeout: 0.60
 
-    # Select the dark floor component enclosed by the bright lab barriers.
-    # Unlike pairing wall runs, this remains continuous through tight bends.
-    detection_mode: dark_corridor
-    roi_top_fraction: 0.48
+    # Explicitly pair the two white boundary runs and follow their midpoint.
+    detection_mode: white_walls
+    roi_top_fraction: 0.30
     max_saturation: 55
     min_value: 165
     morphology_kernel: 3
-    min_component_area: 150
+    min_component_area: 80
 
-    near_row_fraction: 0.65
-    far_row_fraction: 0.15
+    # At the installed camera pitch both walls leave the bottom of the frame;
+    # sample the visible overlap instead of rejecting the image.
+    near_row_fraction: 0.55
+    far_row_fraction: 0.40
     sample_row_count: 10
     row_band_height: 5
     min_corridor_width: 12
     min_wall_width: 2
     minimum_confidence: 0.50
 
-    kp_lateral: 0.80
+    kp_lateral: 1.35
     kd_lateral: 0.01
-    kp_heading: 1.20
-    kp_heading_right: 1.20
+    # The far projection includes divider walls in this compact track.  The
+    # near gap is the reliable steering signal, so do not steer from that
+    # ambiguous far sample.
+    kp_heading: 0.0
+    kp_heading_right: 0.0
     heading_deadband: 0.08
     steering_smoothing: 0.40
 
-    # The camera supplies the nominal centerline. LiDAR is used only to slow,
-    # stop, and bias the turn when a tight bend puts a wall directly ahead.
+    # LiDAR limits forward motion in both camera and route-assisted modes.
+    # The scanner's minimum range is 0.12 m; stop above that blind zone.
     use_lidar_safety: true
-    lidar_stop_distance: 0.18
-    lidar_slow_distance: 0.55
-    lidar_corner_gain: 0.0
+    lidar_stop_distance: 0.14
+    lidar_slow_distance: 0.40
+    lidar_corner_gain: 0.80
     lidar_center_gain: 0.0
 
     max_linear_speed: 0.20
