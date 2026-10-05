@@ -20,6 +20,7 @@ from std_msgs.msg import Float32MultiArray, String
 
 
 class DataCollection(Node):
+    RECORDING_RATE_HZ = 10.0
     SECTOR_CENTERS_DEG = tuple(range(0, 360, 10))
     SECTOR_HALF_WIDTH_DEG = 3.0
     SECTOR_PERCENTILE = 10
@@ -64,6 +65,10 @@ class DataCollection(Node):
             String,
             '/data_collection/status',
             status_qos,
+        )
+        self.recording_timer = self.create_timer(
+            1.0 / self.RECORDING_RATE_HZ,
+            self.log_sample,
         )
 
         self.expert_linear_velocity = 0.0
@@ -222,9 +227,8 @@ class DataCollection(Node):
         sector_message = Float32MultiArray()
         sector_message.data = sector_ranges
         self.sector_publisher.publish(sector_message)
-        self.log_scan()
 
-    def log_scan(self):
+    def log_sample(self):
         if (
             not self.is_recording
             or not self.received_expert_command
