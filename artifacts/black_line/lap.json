@@ -1,0 +1,19 @@
+{
+  "samples": 1287,
+  "laps": 1,
+  "distance_m": 16.09701464746785,
+  "sim_seconds": 142.22,
+  "angular_step_p95": 0.03052297880919061,
+  "angular_step_max": 0.06946875,
+  "angular_acceleration_p95": 0.30508359374203115,
+  "angular_acceleration_max": 0.6306563272267781,
+  "mean_speed": 0.11386985522286802,
+  "minimum_lidar_range": 0.11999999731779099,
+  "max_odometry_error": 0.05260536781845597,
+  "max_estimate_error": 0.05260536781845597,
+  "minimum_robot_envelope_clearance_m": -0.0029325848422732392,
+  "test_engine": "Gazebo Fortress / Ogre2 software, 0.004 s step, 10 Hz camera",
+  "minimum_padded_footprint_separation_m": 0.022062138945855125,
+  "footprint_padding_m": 0.015,
+  "footprint_check_passed": true
+}

@@ -38,6 +38,7 @@ class VisionCorridorController(Node):
             row_band_height=self._parameter('row_band_height'),
             min_corridor_width=self._parameter('min_corridor_width'),
             min_wall_width=self._parameter('min_wall_width'),
+            black_max_value=self._parameter('black_max_value'),
         )
 
         self._kp_lateral = float(self._parameter('kp_lateral'))
@@ -176,6 +177,7 @@ class VisionCorridorController(Node):
             'roi_top_fraction': 0.35,
             'max_saturation': 85,
             'min_value': 105,
+            'black_max_value': 55,
             'morphology_kernel': 5,
             'min_component_area': 350,
             'near_row_fraction': 0.86,
@@ -383,6 +385,10 @@ class VisionCorridorController(Node):
             0.0,
             abs(heading_error) - self._heading_deadband,
         )
+        if self._detector.detection_mode == 'black_line':
+            # Aim at the observed paint ahead. A far-minus-near heading term
+            # can oppose this correction when the line exits the image.
+            heading_control = 0.0
         lateral_derivative = (
             lateral_error - self._previous_lateral_error
         ) / delta_time
@@ -583,6 +589,8 @@ class VisionCorridorController(Node):
 
     def _lidar_recovery_command(self) -> Optional[Twist]:
         """Turn toward free space until the camera corridor reappears."""
+        if self._detector.detection_mode == 'black_line':
+            return None  # Lost paint means stop, never steer from walls.
         if not self._use_lidar_safety or self._latest_scan is None:
             return None
 

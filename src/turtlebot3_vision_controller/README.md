@@ -49,28 +49,23 @@ ros2 launch turtlebot3_vision_controller vision_controller.launch.py \
 turtlebot3_vision_controller/config/lab_track.yaml
 ```
 
-The lab configuration uses the surveyed route with wheel distance and IMU
-heading. The camera detector runs for diagnostics; **this configuration does
-not steer from camera pixels**. Set `use_lab_waypoints: false` and
-`use_imu_heading: false` to experiment with camera steering. Camera-only lap
-completion is not established by the route-assisted tests.
+The lab configuration follows the black painted centerline using camera pixels.
+Stored waypoints, odometry steering, IMU heading and wall-based recovery are
+disabled. LiDAR only reduces forward speed near obstacles; losing the line
+stops the robot. The narrow-track configuration still follows its bright floor.
 
-Start the robot and controller at the documented pose so the route and sensor
-frames agree. Restart the simulator as well as the controller after updating:
-the lab world now enables the IMU system. Rebuild with:
+Start on the line at the documented pose, facing along it. Restart the simulator
+and controller after updating the world. Rebuild with:
 
 ```bash
 colcon build --packages-select environments turtlebot3_vision_controller --symlink-install
 source install/setup.bash
 ```
 
-The lab follower uses a continuous 0.22 m lookahead instead of switching between
-targets 5–8 cm away. It limits linear and angular acceleration, uses IMU heading
-to reduce wheel-odometry drift, and applies LiDAR slowdown in route mode too.
-The 0.14 m stop threshold is above the scanner's 0.12 m minimum range. Sensor
-timeouts stop motion, and emergency braking bypasses acceleration smoothing.
-Route-assisted operation waits for camera, scan, odometry and IMU messages.
-The debug image identifies the active mode (`ROUTE`, `CAMERA`, or recovery).
+The black-pixel threshold is `black_max_value` (HSV value, 0–255). Debug images
+overlay detected paint in green. Sensor timeouts stop motion and LiDAR braking
+bypasses acceleration smoothing. The 0.14 m stop threshold is above the
+scanner's 0.12 m minimum range.
 
 For testing without a desktop renderer, append `headless_rendering:=true` to
 the environment launch command. Keep only one Gazebo server per `GZ_PARTITION`
@@ -84,7 +79,7 @@ ros2 run rqt_image_view rqt_image_view \
 ```
 
 With the narrow-track configuration, the green overlay covers the drivable
-surface. With the lab configuration, it covers the two white barriers. In
+surface. With the lab configuration, it covers the black centerline. In
 both modes, blue horizontal lines should span the free corridor and green
 points should follow its center. Stop the controller with Ctrl+C before
 teleoperating the robot.
@@ -101,6 +96,26 @@ teleoperating the robot.
 All defaults are in `config/narrow_track.yaml`.
 
 ## Repeat the simulation test
+
+For an isolated black-line test on Gazebo Fortress (including simulator,
+bridges, camera recordings and a ground-truth lap count), run:
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+python3 scripts/test_black_line_sim.py
+```
+
+It uses domain 87, a 10 Hz camera, a 4 ms physics step and software Ogre2
+rendering. Results are written to `artifacts/black_line/lap.json` and `lap.csv`.
+It fails if a lap is not completed or the robot's rectangular collision envelope,
+expanded by 15 mm, intersects wall geometry at any recorded position. Ground truth is used only
+for evaluation, never steering.
+
+Recorded black-line result: one 16.10 m lap in 142.22 simulation seconds,
+with at least 22 mm separation after the 15 mm footprint padding. The existing
+45 mm painted line was sufficient. This validates the documented start pose
+and test conditions; other starts and lighting have not been tested.
 
 Use a separate `ROS_DOMAIN_ID` and `GZ_PARTITION` in **every** test terminal,
 then launch the lab simulator at the documented start pose. Do not launch the

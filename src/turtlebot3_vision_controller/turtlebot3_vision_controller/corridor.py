@@ -37,6 +37,7 @@ class CorridorDetector:
         min_corridor_width: int = 8,
         detection_mode: str = 'bright_corridor',
         min_wall_width: int = 3,
+        black_max_value: int = 55,
     ) -> None:
         self.roi_top_fraction = roi_top_fraction
         self.max_saturation = max_saturation
@@ -48,10 +49,12 @@ class CorridorDetector:
         self.sample_row_count = max(2, sample_row_count)
         self.row_band_height = max(1, row_band_height)
         self.min_corridor_width = max(2, min_corridor_width)
+        self.black_max_value = black_max_value
         if detection_mode not in (
             'bright_corridor',
             'dark_corridor',
             'white_walls',
+            'black_line',
         ):
             raise ValueError(
                 'detection_mode must be bright_corridor, dark_corridor, '
@@ -84,6 +87,9 @@ class CorridorDetector:
             np.array([0, 0, self.min_value], dtype=np.uint8),
             np.array([179, self.max_saturation, 255], dtype=np.uint8),
         )
+        if self.detection_mode == 'black_line':
+            mask = cv2.inRange(hsv, np.array([0, 0, 0], dtype=np.uint8),
+                               np.array([179, 255, self.black_max_value], dtype=np.uint8))
 
         kernel_size = self.morphology_kernel
         if kernel_size % 2 == 0:
@@ -92,7 +98,7 @@ class CorridorDetector:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
 
-        if self.detection_mode in ('bright_corridor', 'dark_corridor'):
+        if self.detection_mode in ('bright_corridor', 'dark_corridor', 'black_line'):
             if self.detection_mode == 'dark_corridor':
                 mask = cv2.bitwise_not(mask)
             detection_mask = self._select_corridor_component(
@@ -255,6 +261,8 @@ class CorridorDetector:
             width = int(right - left + 1)
             if width < self.min_corridor_width:
                 continue
+            if self.detection_mode == 'black_line' and width > mask.shape[1] * 0.80:
+                continue  # A broad dark region is not the painted stripe.
             center = (left + right) / 2.0
             candidates.append((
                 abs(center - expected_x),

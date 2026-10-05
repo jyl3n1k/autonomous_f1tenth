@@ -4,6 +4,37 @@ import numpy as np
 from turtlebot3_vision_controller.corridor import CorridorDetector
 
 
+def test_black_line_on_gray_floor_ignores_white_walls():
+    frame = np.full((240, 320, 3), 140, dtype=np.uint8)
+    frame[:, :30] = 245
+    frame[:, 290:] = 245
+    cv2.line(frame, (185, 239), (170, 120), (4, 4, 4), 9)
+    detector = CorridorDetector(detection_mode='black_line', morphology_kernel=1,
+                                min_component_area=40, min_corridor_width=2,
+                                roi_top_fraction=.5)
+    detection = detector.detect(frame)
+    assert detection is not None
+    assert 170 < detection.near_center[0] < 190
+    assert detection.confidence == 1.0
+    frame[:, 30:290] = 140
+    assert detector.detect(frame) is None
+    assert detector.detect(np.zeros_like(frame)) is None
+
+
+def test_black_line_remains_visible_in_near_rows_during_tight_turn():
+    frame = np.full((240, 320, 3), 140, dtype=np.uint8)
+    cv2.polylines(frame, [np.array([(175, 239), (200, 218), (260, 198),
+                                   (319, 195)], dtype=np.int32)],
+                  False, (4, 4, 4), 12)
+    detector = CorridorDetector(detection_mode='black_line', morphology_kernel=1,
+        min_component_area=40, min_corridor_width=2, roi_top_fraction=.5,
+        near_row_fraction=.90, far_row_fraction=.65, sample_row_count=12)
+    detection = detector.detect(frame)
+    assert detection is not None
+    assert detection.confidence >= .5
+    assert detection.near_center[0] > 160
+
+
 def make_track(offset_near=0, offset_far=0):
     image = np.zeros((240, 320, 3), dtype=np.uint8)
     image[:, :] = (0, 190, 245)  # Yellow exterior in BGR.

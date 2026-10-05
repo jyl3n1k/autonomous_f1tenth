@@ -71,6 +71,12 @@ def test_emergency_stop_bypasses_acceleration_and_minimum_speed():
     assert result.angular.z == pytest.approx(0.05)
 
 
+def test_lost_black_line_never_uses_wall_based_recovery():
+    node = controller_without_ros()
+    node._detector = SimpleNamespace(detection_mode='black_line')
+    assert node._lidar_recovery_command() is None
+
+
 def test_slowdown_can_go_below_minimum_cruise_speed():
     node = controller_without_ros()
     node._front_clearance = lambda: 0.15
