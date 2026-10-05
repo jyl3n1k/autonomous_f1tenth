@@ -94,6 +94,19 @@ BARRIER_PATHS = (
 
 RECOMMENDED_SPAWN = (2.20, 0.65, 0.0)
 
+# Closed driving route through both divider bends, sampled with continuous
+# tangents (including the closing seam). Dimensions are in metres.
+CENTERLINE_POINTS = (
+    (1.50, .66), (2.20, .65), (3.05, .70), (3.57, .94),
+    (3.72, 1.55), (3.72, 2.35), (3.59, 2.98), (3.38, 3.20),
+    (2.65, 3.28), (1.90, 3.29), (1.70, 3.55), (1.96, 3.88),
+    (2.65, 4.10), (3.12, 4.28), (3.52, 4.68), (3.49, 5.14),
+    (2.91, 5.40), (2.15, 5.42), (1.40, 5.34), (.86, 5.03),
+    (.84, 4.35), (.85, 3.50), (.84, 2.60), (.84, 1.55),
+    (.91, 1.04),
+)
+CENTERLINE_WIDTH = 0.045
+
 
 def _catmull_rom_point(p0, p1, p2, p3, t):
     """Return a point on a uniform Catmull-Rom spline."""
@@ -244,8 +257,8 @@ def _build_world():
 
     for filename, name in (
         ('gz-sim-physics-system', 'gz::sim::systems::Physics'),
-        ('gz-sim-sensors-system', 'gz::sim::systems::Sensors'),
         ('gz-sim-imu-system', 'gz::sim::systems::Imu'),
+        ('gz-sim-sensors-system', 'gz::sim::systems::Sensors'),
         ('gz-sim-user-commands-system', 'gz::sim::systems::UserCommands'),
         ('gz-sim-scene-broadcaster-system', 'gz::sim::systems::SceneBroadcaster'),
     ):
@@ -266,8 +279,29 @@ def _build_world():
 
     _add_floor(world)
     _add_walls(world)
+    _add_centerline(world)
     ET.indent(sdf, space='  ')
     return ET.ElementTree(sdf)
+
+
+def _add_centerline(world):
+    """Paint a thin black ribbon above the floor, without collision geometry."""
+    model = _subelement(world, 'model', name='lab_centerline')
+    _subelement(model, 'static', 'true')
+    link = _subelement(model, 'link', name='paint')
+    points = _sample_path(CENTERLINE_POINTS, True)
+    for index, start in enumerate(points):
+        end = points[(index + 1) % len(points)]
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        visual = _subelement(link, 'visual', name=f'line_{index:04d}')
+        _subelement(visual, 'pose',
+                    f'{(start[0]+end[0])/2:.6f} {(start[1]+end[1])/2:.6f} '
+                    f'0.001 0 0 {math.atan2(dy, dx):.8f}')
+        _add_box_geometry(visual,
+                          f'{math.hypot(dx, dy)+0.003:.6f} {CENTERLINE_WIDTH} 0.001')
+        _add_material(visual, '0.005 0.005 0.005 1', '0.005 0.005 0.005 1')
+        visual.find('material/specular').text = '0 0 0 1'
+        _subelement(visual, 'cast_shadows', 'false')
 
 
 def main():
